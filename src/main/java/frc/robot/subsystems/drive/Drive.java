@@ -71,6 +71,10 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Drive extends SubsystemBase implements Vision.VisionConsumer {
+
+    // TODO: temporary variable for debug purposes
+    public Pose2d closestApriltag = new Pose2d();
+
     // TunerConstants doesn't include these constants, so they are declared locally
     static final double ODOMETRY_FREQUENCY =
             new CANBus(TunerConstants.DrivetrainConstants.CANBusName).isNetworkFD() ? 250.0 : 100.0;
@@ -259,7 +263,8 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
 
         // Update gyro alert
         gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.currentMode != Mode.SIM);
-        Logger.recordOutput("closestTag", getClosestReefAprilTag(getPose()));
+        closestApriltag = getClosestReefAprilTag(getPose());
+        Logger.recordOutput("closestTag", closestApriltag);
     }
 
     /**
@@ -397,7 +402,7 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
         return getMaxLinearSpeedMetersPerSec() / DRIVE_BASE_RADIUS;
     }
 
-    public static Pose2d getClosestReefAprilTag(Pose2d pose) {
+    public Pose2d getClosestReefAprilTag(Pose2d pose) {
         var alliance = DriverStation.getAlliance();
 
         ArrayList<Pose2d> reefPoseList;
@@ -410,9 +415,10 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
         return pose.nearest(reefPoseList);
     }
 
-    public Command driveToApriltag() {
+    public Command driveToApriltag(Pose2d targetPose) {
+        Logger.recordOutput("targetTag", targetPose);
         return AutoBuilder.pathfindToPoseFlipped(
-                getClosestReefAprilTag(getPose()), new PathConstraints(3.0, 3.0, 2 * Math.PI, 4 * Math.PI));
+                targetPose, new PathConstraints(1.0, 1.0, 100.0 * Math.PI, 100.0 * Math.PI));
     }
     /** Returns an array of module translations. */
     public static Translation2d[] getModuleTranslations() {

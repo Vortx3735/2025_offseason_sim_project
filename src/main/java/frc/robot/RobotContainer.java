@@ -128,7 +128,7 @@ public class RobotContainer {
                 drive, () -> -controller.getLeftY(), () -> -controller.getLeftX(), () -> -controller.getRightX()));
 
         // TODO: go to nearest apriltag when a is pressed
-        controller.a().onTrue(drive.driveToApriltag());
+        controller.a().onTrue(drive.driveToApriltag(drive.closestApriltag).withName("pathplannerAutoalign"));
 
         // Switch to X pattern when X button is pressed
         controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
