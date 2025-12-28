@@ -51,6 +51,8 @@ import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.Constants;
@@ -263,6 +265,7 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
 
         // Update gyro alert
         gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.currentMode != Mode.SIM);
+
         closestApriltag = getClosestReefAprilTag(getPose());
         Logger.recordOutput("closestTag", closestApriltag);
     }
@@ -415,10 +418,12 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
         return pose.nearest(reefPoseList);
     }
 
-    public Command driveToApriltag(Pose2d targetPose) {
-        Logger.recordOutput("targetTag", targetPose);
-        return AutoBuilder.pathfindToPoseFlipped(
-                targetPose, new PathConstraints(1.0, 1.0, 100.0 * Math.PI, 100.0 * Math.PI));
+    public Command driveToApriltag(Pose2d targetTag) {
+        
+        Logger.recordOutput("stupid", targetTag);
+        return Commands.sequence(
+                new InstantCommand(() -> Logger.recordOutput("targetTag", targetTag)),
+                AutoBuilder.pathfindToPose(targetTag, new PathConstraints(1.0, 1.0, 100.0 * Math.PI, 100.0 * Math.PI)));
     }
     /** Returns an array of module translations. */
     public static Translation2d[] getModuleTranslations() {

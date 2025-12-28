@@ -24,6 +24,7 @@ import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.DriveCommands;
@@ -128,7 +129,12 @@ public class RobotContainer {
                 drive, () -> -controller.getLeftY(), () -> -controller.getLeftX(), () -> -controller.getRightX()));
 
         // TODO: go to nearest apriltag when a is pressed
-        controller.a().onTrue(drive.driveToApriltag(drive.closestApriltag).withName("pathplannerAutoalign"));
+        controller
+                .a()
+                .onTrue(Commands.parallel(
+                                drive.driveToApriltag(drive.closestApriltag),
+                                new InstantCommand(() -> Logger.recordOutput("target", drive.closestApriltag)))
+                        .withName("pathplannerAutoalign"));
 
         // Switch to X pattern when X button is pressed
         controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
