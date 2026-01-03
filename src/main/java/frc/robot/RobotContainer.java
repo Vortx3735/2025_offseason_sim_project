@@ -24,7 +24,6 @@ import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.commands.Autoalign;
@@ -44,8 +43,7 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
  * Instead, the structure of the robot (including subsystems, commands, and button mappings) should be declared here.
  */
 public class RobotContainer {
-    private final Autoalign autoalign = new Autoalign();
-    private Pose2d dumb = new Pose2d(4, 7, new Rotation2d());
+
     // Subsystems
     private final Vision vision;
     private final Drive drive;
@@ -57,6 +55,7 @@ public class RobotContainer {
     // Dashboard inputs
     private final LoggedDashboardChooser<Command> autoChooser;
 
+    private final Autoalign autoalign;
     /** The container for the robot. Contains subsystems, OI devices, and commands. */
     public RobotContainer() {
         switch (Constants.currentMode) {
@@ -117,6 +116,7 @@ public class RobotContainer {
         autoChooser.addOption("Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
         autoChooser.addOption("Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
 
+        autoalign = new Autoalign(drive);
         // Configure the button bindings
         configureButtonBindings();
     }
@@ -130,51 +130,15 @@ public class RobotContainer {
         // Default command, normal field-relative drive
         drive.setDefaultCommand(DriveCommands.joystickDrive(
                 drive, () -> -controller.getLeftY(), () -> -controller.getLeftX(), () -> -controller.getRightX()));
-
         // TODO: go to nearest apriltag when a is pressed
+        controller.a().onTrue(autoalign.generate().withTimeout(4).withName("pathplannerAutoalign"));
+        // snap to closest apriltag while holding x
         controller
-                .a()
-                .onTrue(Commands.sequence(
-                                new InstantCommand(() -> Logger.recordOutput(
-                                        "targetPose",
-                                        new Pose2d(
-                                                drive.closestApriltag
-                                                        .getTranslation()
-                                                        .minus(new Translation2d(
-                                                                0.7
-                                                                        * Math.cos(
-                                                                                drive.closestApriltag
-                                                                                                .getRotation()
-                                                                                                .getRadians()
-                                                                                        + Math.PI),
-                                                                0.7
-                                                                        * Math.sin(
-                                                                                drive.closestApriltag
-                                                                                                .getRotation()
-                                                                                                .getRadians()
-                                                                                        + Math.PI))),
-                                                drive.closestApriltag.getRotation()))),
-                                autoalign.generate(
-                                        () -> new Pose2d(
-                                                drive.closestApriltag
-                                                        .getTranslation()
-                                                        .minus(new Translation2d(
-                                                                0.7
-                                                                        * Math.cos(drive.closestApriltag
-                                                                                        .getRotation()
-                                                                                        .getRadians()
-                                                                                + Math.PI),
-                                                                0.7
-                                                                        * Math.sin(drive.closestApriltag
-                                                                                        .getRotation()
-                                                                                        .getRadians()
-                                                                                + Math.PI))),
-                                                drive.closestApriltag.getRotation()), // Example of a dynamic supplier
-                                        () -> drive.getPose()))
-                        .withTimeout(4)
-                        .withName("pathplannerAutoalign"));
-        // Switch to X pattern when X button is pressed
-        controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
+                .x()
+                .whileTrue(DriveCommands.joystickDriveAtAngle(
+                        drive, () -> -controller.getLeftY(), () -> -controller.getLeftX(), () -> autoalign
+                                .getClosestReefAprilTag()
+                                .getRotation()));
 
         // Reset gyro / odometry
         final Runnable resetOdometry = Constants.currentMode == Constants.Mode.SIM
@@ -233,9 +197,5 @@ public class RobotContainer {
                 "FieldSimulation/Coral", SimulatedArena.getInstance().getGamePiecesArrayByType("Coral"));
         Logger.recordOutput(
                 "FieldSimulation/Algae", SimulatedArena.getInstance().getGamePiecesArrayByType("Algae"));
-    }
-
-    public void wrapper(Pose2d a) {
-        this.dumb = a;
     }
 }

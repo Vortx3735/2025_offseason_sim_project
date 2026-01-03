@@ -27,8 +27,6 @@ import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.pathfinding.Pathfinding;
 import com.pathplanner.lib.util.PathPlannerLogging;
-import edu.wpi.first.apriltag.AprilTagFieldLayout;
-import edu.wpi.first.apriltag.AprilTagFields;
 import edu.wpi.first.hal.FRCNetComm.tInstances;
 import edu.wpi.first.hal.FRCNetComm.tResourceType;
 import edu.wpi.first.hal.HAL;
@@ -56,10 +54,7 @@ import frc.robot.Constants;
 import frc.robot.Constants.Mode;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.vision.Vision;
-import frc.robot.util.AprilTagRegion;
 import frc.robot.util.LocalADStarAK;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -70,9 +65,6 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Drive extends SubsystemBase implements Vision.VisionConsumer {
-
-    // TODO: temporary variable for debug purposes
-    public Pose2d closestApriltag = new Pose2d();
 
     // TunerConstants doesn't include these constants, so they are declared locally
     static final double ODOMETRY_FREQUENCY =
@@ -137,11 +129,6 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
             new SwerveDrivePoseEstimator(kinematics, rawGyroRotation, lastModulePositions, new Pose2d());
     private final Consumer<Pose2d> resetSimulationPoseCallBack;
 
-    public static ArrayList<Pose2d> blueReefTagPoses = new ArrayList<>();
-    public static ArrayList<Pose2d> redReefTagPoses = new ArrayList<>();
-    public static ArrayList<Pose2d> allReefTagPoses = new ArrayList<>();
-    public static AprilTagFieldLayout field = AprilTagFieldLayout.loadField(AprilTagFields.kDefaultField);
-
     public Drive(
             GyroIO gyroIO,
             ModuleIO flModuleIO,
@@ -167,27 +154,6 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
                 new SysIdRoutine.Config(
                         null, null, null, (state) -> Logger.recordOutput("Drive/SysIdState", state.toString())),
                 new SysIdRoutine.Mechanism((voltage) -> runCharacterization(voltage.in(Volts)), null, this));
-
-        Arrays.stream(AprilTagRegion.kReef.blue()).forEach((i) -> {
-            field.getTagPose(i).ifPresent((p) -> {
-                blueReefTagPoses.add(new Pose2d(
-                        p.getMeasureX(), p.getMeasureY(), p.getRotation().toRotation2d()));
-            });
-        });
-
-        Arrays.stream(AprilTagRegion.kReef.red()).forEach((i) -> {
-            field.getTagPose(i).ifPresent((p) -> {
-                redReefTagPoses.add(new Pose2d(
-                        p.getMeasureX(), p.getMeasureY(), p.getRotation().toRotation2d()));
-            });
-        });
-
-        Arrays.stream(AprilTagRegion.kReef.both()).forEach((i) -> {
-            field.getTagPose(i).ifPresent((p) -> {
-                allReefTagPoses.add(new Pose2d(
-                        p.getMeasureX(), p.getMeasureY(), p.getRotation().toRotation2d()));
-            });
-        });
 
         // Configure AutoBuilder for PathPlanner
         AutoBuilder.configure(
@@ -262,9 +228,6 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
 
         // Update gyro alert
         gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.currentMode != Mode.SIM);
-
-        closestApriltag = getClosestReefAprilTag(getPose());
-        Logger.recordOutput("closestTag", closestApriltag);
     }
 
     /**
@@ -400,19 +363,6 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
     /** Returns the maximum angular speed in radians per sec. */
     public double getMaxAngularSpeedRadPerSec() {
         return getMaxLinearSpeedMetersPerSec() / DRIVE_BASE_RADIUS;
-    }
-
-    public Pose2d getClosestReefAprilTag(Pose2d pose) {
-        var alliance = DriverStation.getAlliance();
-
-        ArrayList<Pose2d> reefPoseList;
-        if (alliance.isEmpty()) {
-            reefPoseList = allReefTagPoses;
-        } else {
-            reefPoseList = alliance.get() == Alliance.Blue ? blueReefTagPoses : redReefTagPoses;
-        }
-
-        return pose.nearest(reefPoseList);
     }
 
     /** Returns an array of module translations. */
