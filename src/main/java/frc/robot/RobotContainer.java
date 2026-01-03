@@ -27,6 +27,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
+import frc.robot.commands.Autoalign;
 import frc.robot.commands.DriveCommands;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.drive.*;
@@ -43,6 +44,8 @@ import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
  * Instead, the structure of the robot (including subsystems, commands, and button mappings) should be declared here.
  */
 public class RobotContainer {
+    private final Autoalign autoalign = new Autoalign();
+    private Pose2d dumb = new Pose2d(4, 7, new Rotation2d());
     // Subsystems
     private final Vision vision;
     private final Drive drive;
@@ -131,11 +134,45 @@ public class RobotContainer {
         // TODO: go to nearest apriltag when a is pressed
         controller
                 .a()
-                .onTrue(Commands.parallel(
-                                drive.driveToApriltag(drive.closestApriltag),
-                                new InstantCommand(() -> Logger.recordOutput("target", drive.closestApriltag)))
+                .onTrue(Commands.sequence(
+                                new InstantCommand(() -> Logger.recordOutput(
+                                        "targetPose",
+                                        new Pose2d(
+                                                drive.closestApriltag
+                                                        .getTranslation()
+                                                        .minus(new Translation2d(
+                                                                0.7
+                                                                        * Math.cos(
+                                                                                drive.closestApriltag
+                                                                                                .getRotation()
+                                                                                                .getRadians()
+                                                                                        + Math.PI),
+                                                                0.7
+                                                                        * Math.sin(
+                                                                                drive.closestApriltag
+                                                                                                .getRotation()
+                                                                                                .getRadians()
+                                                                                        + Math.PI))),
+                                                drive.closestApriltag.getRotation()))),
+                                autoalign.generate(
+                                        () -> new Pose2d(
+                                                drive.closestApriltag
+                                                        .getTranslation()
+                                                        .minus(new Translation2d(
+                                                                0.7
+                                                                        * Math.cos(drive.closestApriltag
+                                                                                        .getRotation()
+                                                                                        .getRadians()
+                                                                                + Math.PI),
+                                                                0.7
+                                                                        * Math.sin(drive.closestApriltag
+                                                                                        .getRotation()
+                                                                                        .getRadians()
+                                                                                + Math.PI))),
+                                                drive.closestApriltag.getRotation()), // Example of a dynamic supplier
+                                        () -> drive.getPose()))
+                        .withTimeout(4)
                         .withName("pathplannerAutoalign"));
-
         // Switch to X pattern when X button is pressed
         controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
 
@@ -196,5 +233,9 @@ public class RobotContainer {
                 "FieldSimulation/Coral", SimulatedArena.getInstance().getGamePiecesArrayByType("Coral"));
         Logger.recordOutput(
                 "FieldSimulation/Algae", SimulatedArena.getInstance().getGamePiecesArrayByType("Algae"));
+    }
+
+    public void wrapper(Pose2d a) {
+        this.dumb = a;
     }
 }

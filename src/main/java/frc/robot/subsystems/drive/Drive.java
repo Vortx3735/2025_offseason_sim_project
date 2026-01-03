@@ -25,7 +25,6 @@ import com.pathplanner.lib.config.ModuleConfig;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
-import com.pathplanner.lib.path.PathConstraints;
 import com.pathplanner.lib.pathfinding.Pathfinding;
 import com.pathplanner.lib.util.PathPlannerLogging;
 import edu.wpi.first.apriltag.AprilTagFieldLayout;
@@ -51,8 +50,6 @@ import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj2.command.Command;
-import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.Constants;
@@ -165,24 +162,6 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
         // Start odometry thread
         PhoenixOdometryThread.getInstance().start();
 
-        // Configure AutoBuilder for PathPlanner
-        AutoBuilder.configure(
-                this::getPose,
-                this::resetOdometry,
-                this::getChassisSpeeds,
-                this::runVelocity,
-                new PPHolonomicDriveController(new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
-                PP_CONFIG,
-                () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
-                this);
-        Pathfinding.setPathfinder(new LocalADStarAK());
-        PathPlannerLogging.setLogActivePathCallback((activePath) -> {
-            Logger.recordOutput("Odometry/Trajectory", activePath.toArray(new Pose2d[activePath.size()]));
-        });
-        PathPlannerLogging.setLogTargetPoseCallback((targetPose) -> {
-            Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
-        });
-
         // Configure SysId
         sysId = new SysIdRoutine(
                 new SysIdRoutine.Config(
@@ -208,6 +187,24 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
                 allReefTagPoses.add(new Pose2d(
                         p.getMeasureX(), p.getMeasureY(), p.getRotation().toRotation2d()));
             });
+        });
+
+        // Configure AutoBuilder for PathPlanner
+        AutoBuilder.configure(
+                this::getPose,
+                this::resetOdometry,
+                this::getChassisSpeeds,
+                this::runVelocity,
+                new PPHolonomicDriveController(new PIDConstants(5.0, 0.0, 0.0), new PIDConstants(5.0, 0.0, 0.0)),
+                PP_CONFIG,
+                () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
+                this);
+        Pathfinding.setPathfinder(new LocalADStarAK());
+        PathPlannerLogging.setLogActivePathCallback((activePath) -> {
+            Logger.recordOutput("Odometry/Trajectory", activePath.toArray(new Pose2d[activePath.size()]));
+        });
+        PathPlannerLogging.setLogTargetPoseCallback((targetPose) -> {
+            Logger.recordOutput("Odometry/TrajectorySetpoint", targetPose);
         });
     }
 
@@ -418,13 +415,6 @@ public class Drive extends SubsystemBase implements Vision.VisionConsumer {
         return pose.nearest(reefPoseList);
     }
 
-    public Command driveToApriltag(Pose2d targetTag) {
-        
-        Logger.recordOutput("stupid", targetTag);
-        return Commands.sequence(
-                new InstantCommand(() -> Logger.recordOutput("targetTag", targetTag)),
-                AutoBuilder.pathfindToPose(targetTag, new PathConstraints(1.0, 1.0, 100.0 * Math.PI, 100.0 * Math.PI)));
-    }
     /** Returns an array of module translations. */
     public static Translation2d[] getModuleTranslations() {
         return new Translation2d[] {
